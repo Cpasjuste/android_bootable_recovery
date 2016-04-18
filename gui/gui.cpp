@@ -731,6 +731,8 @@ std::string gui_lookup(const std::string& resource_name, const std::string& defa
 extern "C" int gui_init(void)
 {
 	gr_init();
+	gr_fb_blank(true);
+	gr_fb_blank(false);
 	TWFunc::Set_Brightness(DataManager::GetStrValue("tw_brightness"));
 
 	// load and show splash screen

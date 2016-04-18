@@ -119,7 +119,7 @@ int TWPartitionManager::Process_Fstab(string Fstab_Filename, bool Display_Error)
 		// Attempt to automatically identify /data/media emulated storage devices
 		TWPartition* Dat = Find_Partition_By_Path("/data");
 		if (Dat) {
-			LOGINFO("Using automatic handling for /data/media emulated storage device.\n");
+			LOGINFO("Using automatic handling for /data/share emulated storage device.\n");
 			datamedia = true;
 			Dat->Setup_Data_Media();
 			settings_partition = Dat;
@@ -326,7 +326,7 @@ void TWPartitionManager::Output_Partition(TWPartition* Part) {
 	string back_meth = Part->Backup_Method_By_Name();
 	printf("   Backup_Method: %s\n", back_meth.c_str());
 	if (Part->Mount_Flags || !Part->Mount_Options.empty())
-		printf("   Mount_Flags=0x%8x, Mount_Options=%s\n", Part->Mount_Flags, Part->Mount_Options.c_str());
+		printf("   Mount_Flags=0x%x, Mount_Options=%s\n", Part->Mount_Flags, Part->Mount_Options.c_str());
 	if (Part->MTP_Storage_ID)
 		printf("   MTP_Storage_ID: %i\n", Part->MTP_Storage_ID);
 	printf("\n");
@@ -1193,12 +1193,31 @@ int TWPartitionManager::Wipe_Android_Secure(void) {
 
 int TWPartitionManager::Format_Data(void) {
 	TWPartition* dat = Find_Partition_By_Path("/data");
+	TWPartition* cust = Find_Partition_By_Path("/cust");
+	string custom;
 
 	if (dat != NULL) {
+		if (dat->Mount(false) && TWFunc::Path_Exists("/data/custom.bin"))
+			TWFunc::read_file("/data/custom.bin", custom);
 		if (!dat->UnMount(true))
 			return false;
 
-		return dat->Wipe_Encryption();
+		bool ret = dat->Wipe_Encryption();
+		if (ret && custom.length() > 0) {
+			TWFunc::write_file("/data/custom.bin", custom);
+			chown("/data/custom.bin", 0, 0);
+			chmod("/data/custom.bin", 0744);
+			if (cust != NULL)
+			if (cust->Mount(false)) {
+				TWFunc::Exec_Cmd("/sbin/ln -sf /cust/" + custom + " /data/cust");
+				TWFunc::Exec_Cmd("/sbin/ln -sf /cust/preinstalled/app /data/dataapp");
+				TWFunc::Exec_Cmd("/sbin/ln -sf /cust/preinstalled/lib /data/datalib");
+				chmod("/data/cust", 0755);
+				chmod("/data/dataapp", 0755);
+				chmod("/data/datalib", 0755);
+			}
+		}
+		return ret;
 	} else {
 		gui_msg(Msg(msg::kError, "unable_to_locate=Unable to locate {1}.")("/data"));
 		return false;
@@ -1211,15 +1230,15 @@ int TWPartitionManager::Wipe_Media_From_Data(void) {
 
 	if (dat != NULL) {
 		if (!dat->Has_Data_Media) {
-			LOGERR("This device does not have /data/media\n");
+			LOGERR("This device does not have /data/share\n");
 			return false;
 		}
 		if (!dat->Mount(true))
 			return false;
 
-		gui_msg("wiping_datamedia=Wiping internal storage -- /data/media...");
+		gui_msg("wiping_datamedia=Wiping internal storage -- /data/share...");
 		Remove_MTP_Storage(dat->MTP_Storage_ID);
-		TWFunc::removeDir("/data/media", false);
+		TWFunc::removeDir("/data/share", false);
 		dat->Recreate_Media_Folder();
 		Add_MTP_Storage(dat->MTP_Storage_ID);
 		return true;
@@ -1421,11 +1440,11 @@ int TWPartitionManager::Decrypt_Device(string Password) {
 
 			// Sleep for a bit so that the device will be ready
 			sleep(1);
-			if (dat->Has_Data_Media && dat->Mount(false) && TWFunc::Path_Exists("/data/media/0")) {
-				dat->Storage_Path = "/data/media/0";
+			if (dat->Has_Data_Media && dat->Mount(false) && TWFunc::Path_Exists("/data/share/0")) {
+				dat->Storage_Path = "/data/share/0";
 				dat->Symlink_Path = dat->Storage_Path;
-				DataManager::SetValue("tw_storage_path", "/data/media/0");
-				DataManager::SetValue("tw_settings_path", "/data/media/0");
+				DataManager::SetValue("tw_storage_path", "/data/share/0");
+				DataManager::SetValue("tw_settings_path", "/data/share/0");
 				dat->UnMount(false);
 				Output_Partition(dat);
 			}

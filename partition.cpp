@@ -708,12 +708,12 @@ void TWPartition::Setup_AndSec(void) {
 }
 
 void TWPartition::Setup_Data_Media() {
-	LOGINFO("Setting up '%s' as data/media emulated storage.\n", Mount_Point.c_str());
+	LOGINFO("Setting up '%s' as data/share emulated storage.\n", Mount_Point.c_str());
 	if (Storage_Name.empty() || Storage_Name == "Data")
 		Storage_Name = "Internal Storage";
 	Has_Data_Media = true;
 	Is_Storage = true;
-	Storage_Path = Mount_Point + "/media";
+	Storage_Path = Mount_Point + "/share";
 	Symlink_Path = Storage_Path;
 	if (Mount_Point == "/data") {
 		Is_Settings_Storage = true;
@@ -724,10 +724,10 @@ void TWPartition::Setup_Data_Media() {
 			Make_Dir("/sdcard", false);
 			Symlink_Mount_Point = "/sdcard";
 		}
-		if (Mount(false) && TWFunc::Path_Exists(Mount_Point + "/media/0")) {
-			Storage_Path = Mount_Point + "/media/0";
+		if (Mount(false) && TWFunc::Path_Exists(Mount_Point + "/share/0")) {
+			Storage_Path = Mount_Point + "/share/0";
 			Symlink_Path = Storage_Path;
-			DataManager::SetValue(TW_INTERNAL_PATH, Mount_Point + "/media/0");
+			DataManager::SetValue(TW_INTERNAL_PATH, Mount_Point + "/share/0");
 			UnMount(true);
 		}
 		DataManager::SetValue("tw_has_internal", 1);
@@ -735,14 +735,18 @@ void TWPartition::Setup_Data_Media() {
 		du.add_absolute_dir(Mount_Point + "/misc/vold");
 		du.add_absolute_dir(Mount_Point + "/.layout_version");
 		du.add_absolute_dir(Mount_Point + "/system/storage.xml");
+		du.add_absolute_dir("/data/cust");
+		du.add_absolute_dir("/data/dataapp");
+		du.add_absolute_dir("/data/datalib");
+		du.add_absolute_dir("/data/custom.bin");
 	} else {
-		if (Mount(true) && TWFunc::Path_Exists(Mount_Point + "/media/0")) {
-			Storage_Path = Mount_Point + "/media/0";
+		if (Mount(true) && TWFunc::Path_Exists(Mount_Point + "/share/0")) {
+			Storage_Path = Mount_Point + "/share/0";
 			Symlink_Path = Storage_Path;
 			UnMount(true);
 		}
 	}
-	du.add_absolute_dir(Mount_Point + "/media");
+	du.add_absolute_dir(Mount_Point + "/share");
 }
 
 void TWPartition::Find_Real_Block_Device(string& Block, bool Display_Error) {
@@ -1111,7 +1115,7 @@ bool TWPartition::Mount(bool Display_Error) {
 			}
 		} else {
 #endif
-			if (!Removable && Display_Error)
+			if (!Removable && Display_Error && (Mount_Flags & 0x1000) != 0)
 				gui_msg(Msg(msg::kError, "fail_mount=Failed to mount '{1}' ({2})")(Mount_Point)(strerror(errno)));
 			else
 				LOGINFO("Unable to mount '%s'\n", Mount_Point.c_str());
@@ -1967,7 +1971,7 @@ bool TWPartition::Wipe_Data_Without_Wiping_Media() {
 	if (!Mount(true))
 		return false;
 
-	gui_msg("wiping_data=Wiping data without wiping /data/media ...");
+	gui_msg("wiping_data=Wiping data without wiping /data/share ...");
 	ret = Wipe_Data_Without_Wiping_Media_Func(Mount_Point + "/");
 	if (ret)
 		gui_msg("done=Done.");
@@ -2347,7 +2351,7 @@ void TWPartition::Find_Actual_Block_Device(void) {
 
 void TWPartition::Recreate_Media_Folder(void) {
 	string Command;
-	string Media_Path = Mount_Point + "/media";
+	string Media_Path = Mount_Point + "/share";
 
 	if (!Mount(true)) {
 		gui_msg(Msg(msg::kError, "recreate_folder_err=Unable to recreate {1} folder.")(Media_Path));
